@@ -1,27 +1,17 @@
 document.addEventListener('DOMContentLoaded', async function() {
-    // Map initialization with zoom control at bottom right
-    const map = L.map('map', {
-        zoomControl: false 
-    }).setView([20, 0], 2);
-    
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 18,
-    }).addTo(map);
-
-    L.control.zoom({
-        position: 'bottomright'
-    }).addTo(map);
+    // Map initialization
+    const map = L.map('map').setView([20, 0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     // NASA icon
     const nasaIcon = L.icon({
         iconUrl: 'https://img.icons8.com/color/48/nasa.png',
-        iconSize: [36, 36],
-        iconAnchor: [18, 36],
-        popupAnchor: [0, -36],
-        className: 'nasa-marker-icon'
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32]
     });
 
+    // DOM elements
     const searchInput = document.getElementById('search');
     const showAllBtn = document.getElementById('show-all');
     const resultsContainer = document.getElementById('results');
@@ -31,27 +21,21 @@ document.addEventListener('DOMContentLoaded', async function() {
     let markers = [];
     let currentDisplayMode = 'all';
 
+    // Main initialization
     async function init() {
         try {
             loadingElement.textContent = "Loading NASA facilities...";
-            
             const response = await fetch('https://data.nasa.gov/resource/gvk9-iz74.json');
             let facilities = await response.json();
-            
             facilities = removeDuplicates(facilities);
             allFacilities = await processFacilityLocations(facilities);
             createAllMarkers(true);
             setupSearch();
-            
-            loadingElement.textContent = `Loaded ${allFacilities.length} NASA facilities`;
-            setTimeout(() => {
-                loadingElement.style.opacity = '0';
-                setTimeout(() => loadingElement.style.display = "none", 300);
-            }, 2000);
-            
+            loadingElement.textContent = `Loaded ${allFacilities.length} facilities`;
+            setTimeout(() => loadingElement.style.display = "none", 2000);
         } catch (error) {
             console.error("Error:", error);
-            loadingElement.innerHTML = `<span style="color: var(--nasa-red)">Error loading data. Please try again later.</span>`;
+            loadingElement.textContent = "Error loading data. See console.";
         }
     }
 
@@ -59,9 +43,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const uniqueMap = new Map();
         facilities.forEach(facility => {
             const key = `${facility.center || facility.facility}-${facility.location?.latitude}-${facility.location?.longitude}`;
-            if (!uniqueMap.has(key)) {
-                uniqueMap.set(key, facility);
-            }
+            if (!uniqueMap.has(key)) uniqueMap.set(key, facility);
         });
         return Array.from(uniqueMap.values());
     }
@@ -96,14 +78,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (!city) return null;
         try {
             const query = [city, state, country].filter(Boolean).join(', ');
-            const response = await fetch(
-                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`
-            );
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`);
             const results = await response.json();
-            return results[0] ? {
-                lat: parseFloat(results[0].lat),
-                lon: parseFloat(results[0].lon)
-            } : null;
+            return results[0] ? { lat: parseFloat(results[0].lat), lon: parseFloat(results[0].lon) } : null;
         } catch (e) {
             console.warn("Geocoding failed for", city, state);
             return null;
@@ -130,34 +107,47 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     function bindPopupContent(marker, facility) {
-        let popupContent = `
+        const baseContent = `
             <div class="facility-info">
                 <h3>${facility.center || facility.facility || 'Unknown Facility'}</h3>
                 <p>${[facility.city, facility.state, facility.country].filter(Boolean).join(', ')}</p>
+                ${facility.locationType === 'approximate' ? '<p><em>Approximate location</em></p>' : ''}
+                ${facility.locationType === 'unknown' ? '<p><em>Location unknown</em></p>' : ''}
+                <div class="weather-container">
+                    <div class="weather-loading">Loading weather data...</div>
+                </div>
+            </div>
         `;
+
+        marker.bindPopup(baseContent);
         
-        if (facility.locationType === 'approximate') {
-            popupContent += `<p><em>Approximate location (city center)</em></p>`;
-        } else if (facility.locationType === 'unknown') {
-            popupContent += `<p><em>Location unknown</em></p>`;
-        }
-        
-        popupContent += `</div>`;
-        marker.bindPopup(popupContent);
-        
-        marker.on('popupopen', async () => {
+        marker.on('popupopen', async function() {
             if (facility.locationType !== 'unknown') {
-                const weather = await fetchWeather(facility.lat, facility.lon);
-                if (weather) {
-                    const popup = marker.getPopup();
-                    popup.setContent(popup.getContent() + `
-                        <div class="weather-display">
-                            <img src="https:${weather.current.condition.icon}" width="20" alt="Weather icon">
-                            ${weather.current.temp_f}°F - ${weather.current.condition.text}
-                        </div>
-                    `);
+                try {
+                    const weather = await fetchWeather(facility.lat, facility.lon);
+                    if (weather) {
+                        const weatherContent = `
+                            <div class="weather-display">
+                                <img src="https:${weather.current.condition.icon}" width="20" alt="Weather icon">
+                                ${weather.current.temp_f}°F - ${weather.current.condition.text}
+                            </div>
+                        `;
+                        this.setPopupContent(baseContent.replace(
+                            '<div class="weather-loading">Loading weather data...</div>',
+                            weatherContent
+                        ));
+                    }
+                } catch (error) {
+                    this.setPopupContent(baseContent.replace(
+                        '<div class="weather-loading">Loading weather data...</div>',
+                        '<div class="weather-error">Weather data unavailable</div>'
+                    ));
                 }
             }
+        });
+
+        marker.on('popupclose', function() {
+            this.setPopupContent(baseContent);
         });
     }
 
@@ -168,9 +158,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 resultsContainer.innerHTML = '';
                 return;
             }
-            const results = allFacilities.filter(facility => 
-                facility.searchText.includes(searchTerm)
-            );
+            const results = allFacilities.filter(facility => facility.searchText.includes(searchTerm));
             displaySearchResults(results);
         });
         
@@ -187,7 +175,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         currentDisplayMode = 'search';
         
         if (results.length === 0) {
-            resultsContainer.innerHTML = '<div class="result-item">No NASA facilities found</div>';
+            resultsContainer.innerHTML = '<div class="result-item">No facilities found</div>';
             hideAllMarkers();
             return;
         }
@@ -198,8 +186,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             const resultItem = document.createElement('div');
             resultItem.className = 'result-item';
             resultItem.textContent = facility.displayName;
-            resultItem.addEventListener('click', () => {
-                zoomToFacility(facility);
+            resultItem.addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectFacility(facility);
             });
             resultsContainer.appendChild(resultItem);
         });
@@ -207,16 +196,39 @@ document.addEventListener('DOMContentLoaded', async function() {
         zoomToVisibleMarkers();
     }
 
+    function selectFacility(facility) {
+        resultsContainer.innerHTML = '';
+        searchInput.value = '';
+        const marker = markers[allFacilities.indexOf(facility)];
+        
+        // Calculate the exact position needed to center the marker
+        const markerLatLng = L.latLng(facility.lat, facility.lon);
+        const markerPixel = map.latLngToContainerPoint(markerLatLng);
+        const centerPixel = map.getSize().divideBy(2);
+        const offset = centerPixel.subtract(markerPixel);
+        
+        // Set the view with calculated padding to perfectly center the marker
+        map.setView(markerLatLng, map.getZoom(), {
+            animate: true,
+            duration: 0.5,
+            paddingTopLeft: [offset.x, offset.y],
+            easeLinearity: 0.25
+        });
+        
+        marker.openPopup();
+        marker.bringToFront();
+        
+        if (currentDisplayMode === 'search') {
+            createAllMarkers(true);
+            currentDisplayMode = 'all';
+        }
+    }
+
     function updateMarkerVisibility(visibleFacilities) {
         markers.forEach((marker, index) => {
             const shouldShow = visibleFacilities.includes(allFacilities[index]);
             marker.setOpacity(shouldShow ? 1 : 0);
         });
-    }
-
-    function zoomToFacility(facility) {
-        map.setView([facility.lat, facility.lon], 12);
-        markers[allFacilities.indexOf(facility)].openPopup();
     }
 
     function zoomToVisibleMarkers() {
@@ -238,9 +250,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     async function fetchWeather(lat, lon) {
         try {
-            const response = await fetch(
-                `https://api.weatherapi.com/v1/current.json?key=4c455336721b4765a08175859252603&q=${lat},${lon}`
-            );
+            const response = await fetch(`https://api.weatherapi.com/v1/current.json?key=4c455336721b4765a08175859252603&q=${lat},${lon}`);
             return await response.json();
         } catch (error) {
             console.warn("Weather API error:", error);
