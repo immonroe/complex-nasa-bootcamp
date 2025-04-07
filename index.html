@@ -1,30 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-    	<meta charset="utf-8">
-    	<meta name="description" content="This is where your description goes">
-    	<meta name="keywords" content="one, two, three">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NASA Facilities Explorer</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Orbitron:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-title">
+            <img src="https://img.icons8.com/color/48/nasa.png" alt="NASA Logo">
+            <span>NASA Facilities Explorer</span>
+        </div>
+        <a href="https://github.com/immonroe" class="github-link" target="_blank" rel="noopener noreferrer">
+            <img src="https://img.icons8.com/ios-glyphs/30/ffffff/github.png" alt="GitHub">
+        </a>
+    </div>
+    
+    <div id="controls">
+        <input type="text" id="search" placeholder="Search NASA facilities...">
+        <button id="show-all">Show All Facilities</button>
+        <div id="results"></div>
+    </div>
+    
+    <div id="map"></div>
+    
+    <div id="loading" class="loading">Loading NASA facilities...</div>
 
-		<title>NASA Complex API</title>
-
-		<!-- external CSS link -->
-		<link rel="stylesheet" href="css/normalize.css">
-		<link rel="stylesheet" href="css/style.css">
-	</head>
-	<body>
-
-		<h1>NASA Date Picker</h1>
-		<h4>Refresh page to update results</h4>
-		
-		<form action="">
-			<!-- <input type="text" name="" value="" placeholder="(YYYY-MM-DD)"> -->
-			<!-- <button type="button" name="button">Refresh</button> -->
-		</form>
-		
-		<section class="results">
-
-		</section>
-		
-		<script type="text/javascript" src="js/main.js"></script>
-	</body>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/main.js"></script>
+</body>
 </html>
